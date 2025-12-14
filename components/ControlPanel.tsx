@@ -127,8 +127,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             value={startNode}
             onChange={(e) => setStartNode(e.target.value)}
           >
-            {nodes.map(node => (
-              <option key={node.id} value={node.id}>{node.id} - {node.name}</option>
+            {nodes.map((node, index) => (
+              <option key={node.id} value={node.id}>{index + 1} - {node.id} - {node.name}</option>
             ))}
           </select>
         </div>
@@ -141,8 +141,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             value={endNode}
             onChange={(e) => setEndNode(e.target.value)}
           >
-            {nodes.map(node => (
-              <option key={node.id} value={node.id}>{node.id} - {node.name}</option>
+            {nodes.map((node, index) => (
+              <option key={node.id} value={node.id}>{index + 1} - {node.id} - {node.name}</option>
             ))}
           </select>
         </div>
