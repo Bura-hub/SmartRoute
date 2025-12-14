@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Graph3D from './components/Graph3D';
 import ControlPanel from './components/ControlPanel';
 import { INITIAL_GRAPH_DATA } from './constants';
 import { dijkstra, bellmanFord, dijkstraStepGenerator, bellmanFordStepGenerator } from './utils/algorithms';
 import { AlgorithmType, WeightType, PathResult, GraphNode, TransportMode, AlgorithmStep } from './types';
+import { Network } from 'lucide-react';
 
 const App: React.FC = () => {
   const [graphData] = useState(INITIAL_GRAPH_DATA);
@@ -12,10 +13,10 @@ const App: React.FC = () => {
   const [algorithm, setAlgorithm] = useState<AlgorithmType>(AlgorithmType.DIJKSTRA);
   const [weightType, setWeightType] = useState<WeightType>(WeightType.DISTANCE);
   const [transportMode, setTransportMode] = useState<TransportMode>(TransportMode.VEHICLE);
-
+  
   // pathResult contiene el cálculo final completo (para modo instantáneo o cuando termina el paso a paso)
   const [pathResult, setPathResult] = useState<PathResult | null>(null);
-
+  
   // Step by Step State
   const [isStepMode, setIsStepMode] = useState(false);
   const [stepState, setStepState] = useState<AlgorithmStep | null>(null);
@@ -27,37 +28,38 @@ const App: React.FC = () => {
 
   // displayedPath es lo que se muestra visualmente
   const [displayedPath, setDisplayedPath] = useState<string[]>([]);
-
+  
   // Error state
   const [error, setError] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  
 
-  // AutoPlay Effect
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (autoPlay && isStepMode && stepState && !stepState.finished) {
-      interval = setInterval(() => {
-        handleNextStep();
-      }, 500);
-    }
-    return () => clearInterval(interval);
-  }, [autoPlay, isStepMode, stepState]);
-
-  // Effect for instant result animation
+  // Effect for instant result animation - Optimized with requestAnimationFrame for smoother animations
   useEffect(() => {
     if (!isStepMode && pathResult && pathResult.path.length > 0) {
       setDisplayedPath([pathResult.path[0]]);
       let currentStep = 0;
-      const interval = setInterval(() => {
-        currentStep++;
-        if (currentStep < pathResult.path.length) {
-          setDisplayedPath(prev => [...prev, pathResult.path[currentStep]]);
-        } else {
-          clearInterval(interval);
+      let animationFrameId: number;
+      let lastTime = performance.now();
+      const frameDelay = 300; // Reduced from 400ms for smoother animation
+
+      const animate = (currentTime: number) => {
+        if (currentTime - lastTime >= frameDelay) {
+          currentStep++;
+          if (currentStep < pathResult.path.length) {
+            setDisplayedPath(prev => [...prev, pathResult.path[currentStep]]);
+            lastTime = currentTime;
+          } else {
+            return; // Animation complete
+          }
         }
-      }, 400); 
-      return () => clearInterval(interval);
+        animationFrameId = requestAnimationFrame(animate);
+      };
+
+      animationFrameId = requestAnimationFrame(animate);
+      
+      return () => {
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      };
     } else if (!isStepMode) {
       setDisplayedPath([]);
     }
@@ -184,7 +186,6 @@ const App: React.FC = () => {
           setAutoPlay(false);
           if (value.pathResult) {
             setPathResult(value.pathResult);
-            // Show full path instantly or animate it? Let's show it fully red
             setDisplayedPath(value.pathResult.path);
           } else {
             setError('El algoritmo terminó pero no se encontró una ruta');
@@ -198,6 +199,24 @@ const App: React.FC = () => {
       console.error('Error in next step:', err);
     }
   }, [currentStepIndex, stepHistory]);
+
+  // AutoPlay Effect - Optimized with useRef to avoid dependency issues
+  const handleNextStepRef = useRef(handleNextStep);
+  useEffect(() => {
+    handleNextStepRef.current = handleNextStep;
+  }, [handleNextStep]);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (autoPlay && isStepMode && stepState && !stepState.finished) {
+      interval = setInterval(() => {
+        handleNextStepRef.current();
+      }, 500);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoPlay, isStepMode, stepState?.finished]);
 
   const handlePreviousStep = useCallback(() => {
     if (currentStepIndex > 0) {
@@ -244,15 +263,6 @@ const App: React.FC = () => {
     [isStepMode, startNode]
   );
 
-  // Memoize graph stats to avoid recalculation
-  const graphStats = useMemo(
-    () => ({
-      nodeCount: graphData.nodes.length,
-      linkCount: graphData.links.length,
-    }),
-    [graphData]
-  );
-
   return (
     <div className="relative w-screen h-screen bg-transparent font-sans overflow-hidden">
       <ControlPanel
@@ -282,15 +292,23 @@ const App: React.FC = () => {
         error={error}
         isCalculating={isCalculating}
       />
-
-      <div className="absolute top-0 right-0 p-4 z-10 pointer-events-none">
-        <div className="bg-slate-900/50 backdrop-blur text-slate-500 text-xs px-3 py-1 rounded border border-slate-700">
-          {graphStats.nodeCount} Nodos | {graphStats.linkCount} Conexiones
+      
+      {/* Top Right Stats - Re-styled */}
+      <div className="absolute top-6 right-6 z-10 pointer-events-none">
+        <div className="bg-slate-950/80 backdrop-blur-xl text-slate-400 text-[10px] font-medium tracking-wide px-4 py-2 rounded-full border border-white/10 shadow-lg flex items-center gap-3">
+           <Network className="w-3 h-3 text-blue-500" />
+           <span className="flex items-center gap-1">
+             <span className="text-white font-bold">{graphData.nodes.length}</span> Nodos
+           </span>
+           <div className="h-3 w-px bg-white/10"></div>
+           <span className="flex items-center gap-1">
+             <span className="text-white font-bold">{graphData.links.length}</span> Conexiones
+           </span>
         </div>
       </div>
 
-      <Graph3D
-        data={graphData}
+      <Graph3D 
+        data={graphData} 
         activePath={displayedPath}
         onNodeClick={handleNodeClick}
         stepState={stepState}
