@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AlgorithmType, WeightType, GraphNode, PathResult, TransportMode, AlgorithmStep } from '../types';
-import { Navigation, Clock, Activity, BrainCircuit, Car, Footprints, Info, MapPin, ChevronDown, ChevronUp, Play, SkipForward, SkipBack, RotateCcw, Pause } from 'lucide-react';
+import { Navigation, Clock, Activity, Car, Footprints, Info, MapPin, ChevronDown, ChevronUp, Play, SkipForward, SkipBack, RotateCcw, Pause } from 'lucide-react';
 
 interface ControlPanelProps {
   nodes: GraphNode[];
@@ -29,8 +29,6 @@ interface ControlPanelProps {
   canGoBack: boolean;
 
   pathResult: PathResult | null;
-  aiDescription: string;
-  isAiLoading: boolean;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -55,9 +53,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   autoPlay,
   setAutoPlay,
   canGoBack,
-  pathResult,
-  aiDescription,
-  isAiLoading
+  pathResult
 }) => {
   const [showGuide, setShowGuide] = useState(false);
 
@@ -292,23 +288,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
              </div>
           </div>
 
-          {/* AI Section */}
-          <div className="mt-4 bg-indigo-900/30 border border-indigo-500/30 p-3 rounded-lg">
-             <div className="flex items-center gap-2 mb-2 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-               <BrainCircuit className="w-3 h-3" />
-               Guía Gemini AI
-             </div>
-             {isAiLoading ? (
-               <div className="animate-pulse flex space-x-2">
-                  <div className="h-2 w-full bg-indigo-500/50 rounded"></div>
-                  <div className="h-2 w-1/2 bg-indigo-500/50 rounded"></div>
-               </div>
-             ) : (
-               <p className="text-xs text-indigo-100 leading-relaxed italic">
-                 "{aiDescription || 'Genera una ruta para ver la descripción...'}"
-               </p>
-             )}
-          </div>
         </div>
       )}
     </div>

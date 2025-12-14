@@ -3,7 +3,6 @@ import Graph3D from './components/Graph3D';
 import ControlPanel from './components/ControlPanel';
 import { INITIAL_GRAPH_DATA } from './constants';
 import { dijkstra, bellmanFord, dijkstraStepGenerator, bellmanFordStepGenerator } from './utils/algorithms';
-import { getRouteDescription } from './services/geminiService';
 import { AlgorithmType, WeightType, PathResult, GraphNode, TransportMode, AlgorithmStep } from './types';
 
 const App: React.FC = () => {
@@ -29,9 +28,6 @@ const App: React.FC = () => {
   // displayedPath es lo que se muestra visualmente
   const [displayedPath, setDisplayedPath] = useState<string[]>([]);
   
-  // AI State
-  const [aiDescription, setAiDescription] = useState<string>('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
 
   // AutoPlay Effect
   useEffect(() => {
@@ -79,7 +75,6 @@ const App: React.FC = () => {
     }
 
     setPathResult(result);
-    triggerAi(result);
   };
 
   const handleStartStepMode = () => {
@@ -127,7 +122,6 @@ const App: React.FC = () => {
             setPathResult(value.pathResult);
             // Show full path instantly or animate it? Let's show it fully red
             setDisplayedPath(value.pathResult.path);
-            triggerAi(value.pathResult);
         }
       }
     }
@@ -159,21 +153,10 @@ const App: React.FC = () => {
     setStepState(null);
     setDisplayedPath([]);
     setAutoPlay(false);
-    setAiDescription('');
     setStepHistory([]);
     setCurrentStepIndex(-1);
   };
 
-  const triggerAi = (result: PathResult | null) => {
-    if (result && result.path.length > 0) {
-      setIsAiLoading(true);
-      setAiDescription('');
-      getRouteDescription(result, graphData.nodes, weightType)
-        .then(desc => setAiDescription(desc))
-        .catch(() => setAiDescription('Error IA'))
-        .finally(() => setIsAiLoading(false));
-    }
-  };
 
   const handleNodeClick = (node: GraphNode) => {
     if (isStepMode) return; // Disable clicking during execution
@@ -213,8 +196,6 @@ const App: React.FC = () => {
         canGoBack={currentStepIndex > 0}
 
         pathResult={pathResult}
-        aiDescription={aiDescription}
-        isAiLoading={isAiLoading}
       />
       
       <div className="absolute top-0 right-0 p-4 z-10 pointer-events-none">
