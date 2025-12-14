@@ -1,0 +1,5 @@
+{
+  "name": "PathFinder 3D - City Map",
+  "description": "Interactive 3D visualization of a 31-node city grid (Pasto, Colombia) with Dijkstra and Bellman-Ford algorithms.",
+  "requestFramePermissions": []
+}
