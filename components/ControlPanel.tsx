@@ -1,7 +1,24 @@
 
 import React, { useState } from 'react';
 import { AlgorithmType, WeightType, GraphNode, PathResult, TransportMode, AlgorithmStep } from '../types';
-import { Navigation, Clock, Activity, Car, Footprints, Info, MapPin, ChevronDown, ChevronUp, Play, SkipForward, SkipBack, RotateCcw, Pause } from 'lucide-react';
+import {
+  Navigation,
+  Clock,
+  Activity,
+  Car,
+  Footprints,
+  Info,
+  MapPin,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  SkipForward,
+  SkipBack,
+  RotateCcw,
+  Pause,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 
 interface ControlPanelProps {
   nodes: GraphNode[];
@@ -16,7 +33,7 @@ interface ControlPanelProps {
   setWeightType: (weight: WeightType) => void;
   setTransportMode: (mode: TransportMode) => void;
   onCalculate: () => void;
-  
+
   // Step Props
   isStepMode: boolean;
   stepState: AlgorithmStep | null;
@@ -29,6 +46,8 @@ interface ControlPanelProps {
   canGoBack: boolean;
 
   pathResult: PathResult | null;
+  error: string | null;
+  isCalculating: boolean;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -53,7 +72,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   autoPlay,
   setAutoPlay,
   canGoBack,
-  pathResult
+  pathResult,
+  error,
+  isCalculating,
 }) => {
   const [showGuide, setShowGuide] = useState(false);
 
@@ -116,39 +137,72 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       <div className="space-y-4">
         {/* Node Selection */}
         <div>
-          <label className="text-xs font-semibold text-slate-400 uppercase mb-1 block">Inicio</label>
-          <select 
+          <label
+            htmlFor="start-node-select"
+            className="text-xs font-semibold text-slate-400 uppercase mb-1 block"
+          >
+            Inicio
+          </label>
+          <select
+            id="start-node-select"
             disabled={isStepMode}
+            aria-label="Seleccionar nodo de inicio"
+            aria-describedby="start-node-description"
             className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer hover:bg-slate-750 disabled:opacity-50"
             value={startNode}
             onChange={(e) => setStartNode(e.target.value)}
           >
             {nodes.map((node, index) => (
-              <option key={node.id} value={node.id}>{index + 1} - {node.id} - {node.name}</option>
+              <option key={node.id} value={node.id}>
+                {index + 1} - {node.id} - {node.name}
+              </option>
             ))}
           </select>
+          <span id="start-node-description" className="sr-only">
+            Selecciona el nodo donde comienza la ruta
+          </span>
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-slate-400 uppercase mb-1 block">Destino</label>
-          <select 
-             disabled={isStepMode}
+          <label
+            htmlFor="end-node-select"
+            className="text-xs font-semibold text-slate-400 uppercase mb-1 block"
+          >
+            Destino
+          </label>
+          <select
+            id="end-node-select"
+            disabled={isStepMode}
+            aria-label="Seleccionar nodo de destino"
+            aria-describedby="end-node-description"
             className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer hover:bg-slate-750 disabled:opacity-50"
             value={endNode}
             onChange={(e) => setEndNode(e.target.value)}
           >
             {nodes.map((node, index) => (
-              <option key={node.id} value={node.id}>{index + 1} - {node.id} - {node.name}</option>
+              <option key={node.id} value={node.id}>
+                {index + 1} - {node.id} - {node.name}
+              </option>
             ))}
           </select>
+          <span id="end-node-description" className="sr-only">
+            Selecciona el nodo donde termina la ruta
+          </span>
         </div>
 
         {/* Algorithm & Weight */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase mb-1 block">Algoritmo</label>
-            <select 
+            <label
+              htmlFor="algorithm-select"
+              className="text-xs font-semibold text-slate-400 uppercase mb-1 block"
+            >
+              Algoritmo
+            </label>
+            <select
+              id="algorithm-select"
               disabled={isStepMode}
+              aria-label="Seleccionar algoritmo de búsqueda"
               className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer disabled:opacity-50"
               value={algorithm}
               onChange={(e) => setAlgorithm(e.target.value as AlgorithmType)}
@@ -158,9 +212,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </select>
           </div>
           <div>
-             <label className="text-xs font-semibold text-slate-400 uppercase mb-1 block">Optimizar</label>
-            <select 
-               disabled={isStepMode}
+            <label
+              htmlFor="weight-select"
+              className="text-xs font-semibold text-slate-400 uppercase mb-1 block"
+            >
+              Optimizar
+            </label>
+            <select
+              id="weight-select"
+              disabled={isStepMode}
+              aria-label="Seleccionar tipo de optimización"
               className="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs focus:ring-2 focus:ring-green-500 outline-none cursor-pointer disabled:opacity-50"
               value={weightType}
               onChange={(e) => setWeightType(e.target.value as WeightType)}
@@ -173,40 +234,79 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         {/* Transport Mode */}
         <div>
-           <label className="text-xs font-semibold text-slate-400 uppercase mb-2 block">Modo de Transporte</label>
-           <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-600">
-              <button 
-                onClick={() => setTransportMode(TransportMode.VEHICLE)}
-                disabled={isStepMode}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${transportMode === TransportMode.VEHICLE ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white hover:bg-slate-700'} disabled:opacity-50`}
-              >
-                <Car className="w-4 h-4" />
-                Vehículo
-              </button>
-              <button 
-                onClick={() => setTransportMode(TransportMode.PEDESTRIAN)}
-                disabled={isStepMode}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${transportMode === TransportMode.PEDESTRIAN ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white hover:bg-slate-700'} disabled:opacity-50`}
-              >
-                <Footprints className="w-4 h-4" />
-                Peatón
-              </button>
-           </div>
+          <label className="text-xs font-semibold text-slate-400 uppercase mb-2 block">
+            Modo de Transporte
+          </label>
+          <div
+            className="flex bg-slate-800 rounded-lg p-1 border border-slate-600"
+            role="radiogroup"
+            aria-label="Seleccionar modo de transporte"
+          >
+            <button
+              onClick={() => setTransportMode(TransportMode.VEHICLE)}
+              disabled={isStepMode}
+              role="radio"
+              aria-checked={transportMode === TransportMode.VEHICLE}
+              aria-label="Modo vehículo"
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${
+                transportMode === TransportMode.VEHICLE
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              } disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            >
+              <Car className="w-4 h-4" />
+              Vehículo
+            </button>
+            <button
+              onClick={() => setTransportMode(TransportMode.PEDESTRIAN)}
+              disabled={isStepMode}
+              role="radio"
+              aria-checked={transportMode === TransportMode.PEDESTRIAN}
+              aria-label="Modo peatonal"
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-md transition-all ${
+                transportMode === TransportMode.PEDESTRIAN
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              } disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-emerald-500`}
+            >
+              <Footprints className="w-4 h-4" />
+              Peatón
+            </button>
+          </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg flex items-start gap-2 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-red-300 flex-1">{error}</p>
+          </div>
+        )}
 
         {/* Buttons Group */}
         {!isStepMode ? (
           <div className="flex gap-2 mt-4">
             <button
               onClick={onCalculate}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-2 rounded-lg shadow-lg text-xs flex items-center justify-center gap-1"
+              disabled={isCalculating || !startNode || !endNode || startNode === endNode}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-lg shadow-lg text-xs flex items-center justify-center gap-1 transition-all"
             >
-              <Navigation className="w-4 h-4" />
-              Ruta Instantánea
+              {isCalculating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Calculando...
+                </>
+              ) : (
+                <>
+                  <Navigation className="w-4 h-4" />
+                  Ruta Instantánea
+                </>
+              )}
             </button>
             <button
               onClick={onStartStep}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white font-bold py-3 px-2 rounded-lg shadow-lg text-xs flex items-center justify-center gap-1"
+              disabled={isCalculating || !startNode || !endNode || startNode === endNode}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed border border-slate-500 text-white font-bold py-3 px-2 rounded-lg shadow-lg text-xs flex items-center justify-center gap-1 transition-all"
             >
               <Play className="w-4 h-4" />
               Paso a Paso

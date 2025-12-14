@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import * as THREE from 'three';
 import { GraphData, GraphNode, GraphLink, AlgorithmStep } from '../types';
@@ -8,11 +8,16 @@ interface Graph3DProps {
   data: GraphData;
   activePath: string[];
   onNodeClick: (node: GraphNode) => void;
-  stepState: AlgorithmStep | null; // Pass detailed algorithm state
+  stepState: AlgorithmStep | null;
+}
+
+// Type for ForceGraph3D ref
+interface ForceGraph3DRef {
+  d3Force: (name: string) => { strength: (value: number) => void };
 }
 
 const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepState }) => {
-  const fgRef = useRef<any>(null);
+  const fgRef = useRef<ForceGraph3DRef | null>(null);
 
   useEffect(() => {
     if (fgRef.current) {
@@ -21,31 +26,38 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
   }, [data]);
 
   // Helper to check if a link is part of the active path segment
-  const isLinkActive = (link: any) => {
-    if (!activePath || activePath.length < 2) return false;
-    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+  const isLinkActive = useCallback(
+    (link: GraphLink | { source: string | GraphNode; target: string | GraphNode }) => {
+      if (!activePath || activePath.length < 2) return false;
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
 
-    // Check if this link connects two consecutive nodes in the active path
-    return activePath.some((id, index) => {
-      if (index === activePath.length - 1) return false;
-      const nextId = activePath[index + 1];
-      return (sourceId === id && targetId === nextId); 
-    });
-  };
+      // Check if this link connects two consecutive nodes in the active path
+      return activePath.some((id, index) => {
+        if (index === activePath.length - 1) return false;
+        const nextId = activePath[index + 1];
+        return sourceId === id && targetId === nextId;
+      });
+    },
+    [activePath]
+  );
 
   // Helper to check if link is part of the constructed tree in step mode
-  const isLinkInTree = (link: any) => {
+  const isLinkInTree = useCallback(
+    (link: GraphLink | { source: string | GraphNode; target: string | GraphNode }) => {
       if (!stepState || !stepState.previous) return false;
       const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
       const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-      
+
       // If target's predecessor is source, this link is part of the tree
       return stepState.previous[targetId] === sourceId;
-  };
+    },
+    [stepState]
+  );
 
   // Helper to calculate node color
-  const getNodeColor = (node: any): string => {
+  const getNodeColor = useCallback(
+    (node: GraphNode): string => {
     // If algorithm finished, highlight the final path
     if (stepState && stepState.finished && activePath.length > 0) {
        if (activePath.includes(node.id)) {
@@ -75,11 +87,14 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
           return '#ef4444'; // Red for path nodes
        }
     }
-    return '#3b82f6'; // Blue default
-  };
+      return '#3b82f6'; // Blue default
+    },
+    [stepState, activePath]
+  );
 
   // Helper to calculate node size
-  const getNodeSize = (node: any): number => {
+  const getNodeSize = useCallback(
+    (node: GraphNode): number => {
     // Prioritize path nodes when algorithm is finished
     if (stepState && stepState.finished && activePath.length > 0 && activePath.includes(node.id)) {
        if (activePath[activePath.length - 1] === node.id) return 120; // Larger for destination
@@ -93,22 +108,25 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
        if (activePath[0] === node.id) return 100; // Start
        return 60; // Path nodes
     }
-    return 30;
-  };
+      return 30;
+    },
+    [stepState, activePath]
+  );
 
   // Helper to get node index in the nodes array
-  const getNodeIndex = (nodeId: string): number => {
-    const index = data.nodes.findIndex(n => n.id === nodeId);
+  const getNodeIndex = useCallback((nodeId: string): number => {
+    const index = data.nodes.findIndex((n) => n.id === nodeId);
     return index >= 0 ? index + 1 : 0; // Return 1-based index, or 0 if not found
-  };
+  }, [data.nodes]);
 
   // Create text sprite for node labels
-  const createNodeLabel = (node: any, nodeRadius: number) => {
-    const sprite = new THREE.Sprite();
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    
-    if (!context) return sprite;
+  const createNodeLabel = useCallback(
+    (node: GraphNode, nodeRadius: number): THREE.Sprite | null => {
+      const sprite = new THREE.Sprite();
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+
+      if (!context) return null;
     
     // Set canvas size - large enough for good text quality when scaled
     // The canvas needs to be large because the sprite will be scaled up in 3D space
@@ -173,10 +191,12 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
     sprite.position.y = 0; // Center vertically
     sprite.position.z = 0; // Center in depth
     
-    sprite.renderOrder = 999; // Render on top
-    
-    return sprite;
-  };
+      sprite.renderOrder = 999; // Render on top
+
+      return sprite;
+    },
+    [getNodeSize]
+  );
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative">
@@ -223,42 +243,42 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
         rendererConfig={{ alpha: true }} // Allow transparency in WebGL
         
         // Label logic: Show cost if in step mode
-        nodeLabel={(node: any) => {
-           const basic = `${node.id}: ${node.name}`;
-           if (stepState && stepState.distances && stepState.distances[node.id] !== undefined) {
-             const cost = stepState.distances[node.id];
-             const costStr = cost === Infinity ? '∞' : cost.toFixed(1);
-             return `${basic} \n Costo Actual: ${costStr}`;
-           }
-           return basic;
+        nodeLabel={(node: GraphNode) => {
+          const basic = `${node.id}: ${node.name}`;
+          if (stepState?.distances && stepState.distances[node.id] !== undefined) {
+            const cost = stepState.distances[node.id];
+            const costStr = cost === Infinity ? '∞' : cost.toFixed(1);
+            return `${basic} \n Costo Actual: ${costStr}`;
+          }
+          return basic;
         }}
-        
-        nodeColor={(node: any) => getNodeColor(node)}
-        
-        nodeVal={(node: any) => getNodeSize(node)} 
+
+        nodeColor={getNodeColor}
+
+        nodeVal={getNodeSize} 
         
         nodeResolution={16}
         nodeOpacity={0.9}
         
         // Node Labels (3D Text)
-        nodeThreeObject={(node: any) => {
+        nodeThreeObject={(node: GraphNode) => {
           const group = new THREE.Group();
-          
+
           // Calculate node properties
           const nodeSize = getNodeSize(node);
           const nodeColor = getNodeColor(node);
           const sphereRadius = nodeSize / 10;
-          
+
           // Add the sphere (node)
           const geometry = new THREE.SphereGeometry(sphereRadius, 16, 16);
-          const material = new THREE.MeshBasicMaterial({ 
+          const material = new THREE.MeshBasicMaterial({
             color: nodeColor,
             transparent: true,
-            opacity: 0.9
+            opacity: 0.9,
           });
           const sphere = new THREE.Mesh(geometry, material);
           group.add(sphere);
-          
+
           // Add text label positioned at the circumference
           try {
             const label = createNodeLabel(node, sphereRadius);
@@ -268,12 +288,12 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
           } catch (error) {
             console.warn('Error creating node label:', error);
           }
-          
+
           return group;
         }}
-        
+
         // Update node objects when data changes
-        nodeThreeObjectExtend={(node: any) => {
+        nodeThreeObjectExtend={(node: GraphNode) => {
           // This ensures the object updates when node properties change
           return true;
         }}
@@ -283,40 +303,41 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
         linkDirectionalArrowLength={3.5}
         linkDirectionalArrowRelPos={1}
         
-        linkWidth={(link: any) => {
-            // If algorithm finished, highlight the final path
-            if (stepState && stepState.finished && isLinkActive(link)) {
-                return 4; // Thicker for final path
-            }
-            if (stepState) {
-                return isLinkInTree(link) ? 3 : 0.5;
-            }
-            return isLinkActive(link) ? 3 : 0.5;
+        linkWidth={(link: GraphLink | { source: string | GraphNode; target: string | GraphNode }) => {
+          // If algorithm finished, highlight the final path
+          if (stepState?.finished && isLinkActive(link)) {
+            return 4; // Thicker for final path
+          }
+          if (stepState) {
+            return isLinkInTree(link) ? 3 : 0.5;
+          }
+          return isLinkActive(link) ? 3 : 0.5;
         }}
-        
-        linkColor={(link: any) => {
-            // If algorithm finished, highlight the final path in red
-            if (stepState && stepState.finished && isLinkActive(link)) {
-                return '#ef4444'; // Red for final path
-            }
-            if (stepState) {
-                // Highlight the tree being built
-                if (isLinkInTree(link)) return '#a855f7'; // Purple-500
-                return '#334155'; // Dark Slate 700
-            }
 
-            if (isLinkActive(link)) return '#ef4444'; 
-            return link.isPedestrianOnly ? '#10b981' : '#ca8a04'; 
+        linkColor={(link: GraphLink | { source: string | GraphNode; target: string | GraphNode }) => {
+          // If algorithm finished, highlight the final path in red
+          if (stepState?.finished && isLinkActive(link)) {
+            return '#ef4444'; // Red for final path
+          }
+          if (stepState) {
+            // Highlight the tree being built
+            if (isLinkInTree(link)) return '#a855f7'; // Purple-500
+            return '#334155'; // Dark Slate 700
+          }
+
+          if (isLinkActive(link)) return '#ef4444';
+          const linkData = link as GraphLink;
+          return linkData.isPedestrianOnly ? '#10b981' : '#ca8a04';
         }}
-        
+
         // Particles
-        linkDirectionalParticles={(link: any) => {
-            // Show particles on final path when algorithm is finished
-            if (stepState && stepState.finished && isLinkActive(link)) {
-                return 6; // More particles for final path
-            }
-            if (stepState) return isLinkInTree(link) ? 2 : 0;
-            return isLinkActive(link) ? 4 : 0;
+        linkDirectionalParticles={(link: GraphLink | { source: string | GraphNode; target: string | GraphNode }) => {
+          // Show particles on final path when algorithm is finished
+          if (stepState?.finished && isLinkActive(link)) {
+            return 6; // More particles for final path
+          }
+          if (stepState) return isLinkInTree(link) ? 2 : 0;
+          return isLinkActive(link) ? 4 : 0;
         }}
         linkDirectionalParticleWidth={4}
         linkDirectionalParticleSpeed={0.005}
@@ -326,7 +347,7 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
             return stepState ? '#d8b4fe' : '#fbbf24';
         }}
         
-        onNodeClick={(node) => onNodeClick(node as GraphNode)}
+        onNodeClick={(node: GraphNode) => onNodeClick(node)}
         
         linkOpacity={0.6}
         showNavInfo={false}
@@ -335,4 +356,4 @@ const Graph3D: React.FC<Graph3DProps> = ({ data, activePath, onNodeClick, stepSt
   );
 };
 
-export default Graph3D;
+export default React.memo(Graph3D);

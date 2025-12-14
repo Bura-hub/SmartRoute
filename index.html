@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PathFinder 3D - Graph Algorithms</title>
+    <meta name="description" content="Visualizador 3D interactivo de algoritmos de búsqueda de rutas óptimas (Dijkstra y Bellman-Ford) para el micro-centro de San Juan de Pasto, Colombia" />
+    <title>PathFinder 3D - Algoritmos de Grafos y Rutas Óptimas</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body { 
@@ -51,7 +52,6 @@
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.32.0",
     "react-force-graph-3d": "https://aistudiocdn.com/react-force-graph-3d@^1.29.0"
   }
 }
@@ -59,7 +59,7 @@
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
-    <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <div id="root" role="main" aria-label="Aplicación PathFinder 3D - Visualizador de rutas óptimas"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>
